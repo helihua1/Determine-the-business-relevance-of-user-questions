@@ -1,5 +1,5 @@
 # 医疗问句相关度分析配置文件
-
+terms_file: "D:/claudetest2/FileProcess/medical_terms.txt"
 # 相似度阈值设置
 similarity_thresholds:
   high_confidence: 0.8      # 高置信度阈值，直接判定为相关

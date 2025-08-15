@@ -26,6 +26,8 @@ from keyword_matcher import KeywordMatcher
 from semantic_analyzer import SemanticAnalyzer
 # （术语提取器）
 from term_extractor import TermExtractor
+# # （Hugging Face配置）
+# import hf_config
 
 class MedicalQuestionAnalyzer:
     """医疗问句分析器主类"""
@@ -39,7 +41,7 @@ class MedicalQuestionAnalyzer:
         self.config = self._load_config(config_file)
         
         # 初始化各个组件，TermLoader() 是类的实例化
-        self.term_loader = TermLoader()
+        self.term_loader = TermLoader(self.config)
         self.keyword_matcher = KeywordMatcher(self.config)
         self.semantic_analyzer = SemanticAnalyzer(self.config)
         self.term_extractor = TermExtractor()
@@ -94,6 +96,12 @@ class MedicalQuestionAnalyzer:
         """初始化各组件"""
         print("正在初始化分析器组件...")
         
+        # # 设置Hugging Face离线模式，避免网络连接问题
+        # try:
+        #     hf_config.setup_hf_offline_mode()
+        # except Exception as e:
+        #     print(f"设置离线模式失败: {e}")
+        
         # 加载术语库
         drugs, devices, diseases, hospitals = self.term_loader.load_terms_from_file()
         
@@ -102,13 +110,28 @@ class MedicalQuestionAnalyzer:
         
         # 初始化语义分析器
         try:
+            print("正在初始化语义分析器...")
             self.semantic_analyzer.build_medical_corpus(drugs, devices, diseases, hospitals)
             self.semantic_analyzer.load_model()
             self.semantic_analyzer.encode_medical_terms()
+            print("语义分析器初始化成功！")
         except Exception as e:
             print(f"语义分析器初始化失败！！！！！！！！！！！！！！！！！！！！！！！！！！！！: {e}")
             print("将只使用关键词匹配功能")
             self.semantic_analyzer = None
+            
+            # # 尝试重新初始化一次
+            # try:
+            #     print("尝试重新初始化语义分析器...")
+            #     self.semantic_analyzer = SemanticAnalyzer(self.config)
+            #     self.semantic_analyzer.build_medical_corpus(drugs, devices, diseases, hospitals)
+            #     self.semantic_analyzer.load_model()
+            #     self.semantic_analyzer.encode_medical_terms()
+            #     print("语义分析器重新初始化成功！")
+            # except Exception as retry_error:
+            #     print(f"重新初始化也失败: {retry_error}")
+            #     print("最终将只使用关键词匹配功能")
+            #     self.semantic_analyzer = None
         
         print("组件初始化完成！")
     
@@ -124,95 +147,127 @@ class MedicalQuestionAnalyzer:
             return 0.0, "", sentence
         
         sentence = sentence.strip()
-        # 流程一
-        # 第一步：关键词匹配 
-        matched_terms = self.keyword_matcher.find_all_matches(sentence)
-        # 流程二
-        # 第二步：提取最关键的术语
-        key_term = self.term_extractor.extract_key_term(matched_terms)
-        if not key_term:
-            key_term = ""
-        # 流程三
-        # 第三步：计算相关度分数
-        relevance_score = self._calculate_relevance_score(sentence, matched_terms)
-        
+        # # 流程一
+        # # 第一步：关键词匹配 进行精确匹配和模糊匹配
+        #
+        # # 返回数据结构 matched_terms:
+        # # {
+        # #     'term1': {
+        # #         'confidence': int,      # 置信度 0-100
+        # #         'match_type': str,      # 'exact' 或 'fuzzy'
+        # #         'priority': int,        # 业务优先级分数
+        # #         'type': str            # 'drug'/'device'/'disease'/'hospital'
+        # #     }
+        # # }
+        #
+        # matched_terms = self.keyword_matcher.find_all_matches(sentence)
+        #
+        #
+        # # 流程二
+        # # 第二步：提取最关键的术语
+        # key_term = self.term_extractor.extract_key_term(matched_terms)
+        # if not key_term:
+        #     key_term = ""
+        #
+        # # 流程三
+        # # 第三步：计算相关度分数
+        # relevance_score = self._calculate_relevance_score(sentence, matched_terms)
+
+        relevance_score = self._calculate_relevance_score(sentence)
+        key_term = "只运行语义分析"
+
         return relevance_score, key_term, sentence
-    
-    def _calculate_relevance_score(self, sentence: str, matched_terms: Dict) -> float:
-        """
-        计算相关度分数
-        Args:
-            sentence: 输入句子
-            matched_terms: 匹配的术语信息
-        Returns:
-            相关度分数 (0.0-1.0)
-        """
-        # 如果有精确匹配的高优先级术语，给高分
-        if self._has_exact_high_priority_match(matched_terms):
-            return 0.95
-        
-        # 如果有模糊匹配的高优先级术语，给较高分
-        if self._has_fuzzy_high_priority_match(matched_terms):
-            return 0.85
-        
-        # 如果有疾病相关术语，给中等分数
-        if self._has_disease_match(matched_terms):
-            return 0.70
-        
-        # 如果有医院相关术语，给较低分数
-        if self._has_hospital_match(matched_terms):
-            return 0.60
-        
-        # 如果没有关键词匹配，使用语义分析
+
+    def _calculate_relevance_score(self, sentence: str) -> float:
+        """不运行模糊和精确匹配，只运行RAG判断的方法"""
+
         if self.semantic_analyzer is not None:
             try:
                 semantic_score = self.semantic_analyzer.calculate_similarity(sentence)
-                # 将语义相似度映射到合适的范围
-                if semantic_score > 0.8:
-                    return 0.75  # 高语义相似度
-                elif semantic_score > 0.6:
-                    return 0.55  # 中等语义相似度
-                elif semantic_score > 0.4:
-                    return 0.35  # 较低语义相似度
-                else:
-                    return 0.15  # 很低相关度
+                return semantic_score
             except Exception as e:
                 print(f"语义分析出错: {e}")
                 return 0.10
-        
-        # 如果没有任何匹配，返回很低的相关度
-        return 0.10
-    
-    def _has_exact_high_priority_match(self, matched_terms: Dict) -> bool:
-        """检查是否有精确匹配的高优先级术语（药物或医疗器械）"""
-        for term, info in matched_terms.items():
-            if (info.get('match_type') == 'exact' and 
-                info.get('type') in ['drug', 'device']):
-                return True
-        return False
-    
-    def _has_fuzzy_high_priority_match(self, matched_terms: Dict) -> bool:
-        """检查是否有模糊匹配的高优先级术语（药物或医疗器械）"""
-        for term, info in matched_terms.items():
-            if (info.get('match_type') == 'fuzzy' and 
-                info.get('type') in ['drug', 'device'] and
-                info.get('confidence', 0) >= 70):
-                return True
-        return False
-    
-    def _has_disease_match(self, matched_terms: Dict) -> bool:
-        """检查是否有疾病相关术语匹配"""
-        for term, info in matched_terms.items():
-            if info.get('type') == 'disease':
-                return True
-        return False
-    
-    def _has_hospital_match(self, matched_terms: Dict) -> bool:
-        """检查是否有医院相关术语匹配"""
-        for term, info in matched_terms.items():
-            if info.get('type') == 'hospital':
-                return True
-        return False
+        return 0.00
+    #
+    # def _calculate_relevance_score(self, sentence: str, matched_terms: Dict) -> float:
+    #     """
+    #     计算相关度分数
+    #     Args:
+    #         sentence: 输入句子
+    #         matched_terms: 匹配的术语信息
+    #     Returns:
+    #         相关度分数 (0.0-1.0)
+    #     """
+    #     # 如果有精确匹配的高优先级术语，给高分
+    #     if self._has_exact_high_priority_match(matched_terms):
+    #         return 0.95
+    #
+    #     # 如果有模糊匹配的高优先级术语，给较高分
+    #     if self._has_fuzzy_high_priority_match(matched_terms):
+    #         return 0.85
+    #
+    #     # 如果有疾病相关术语，给中等分数
+    #     if self._has_disease_match(matched_terms):
+    #         return 0.70
+    #
+    #     # 如果有医院相关术语，给较低分数
+    #     if self._has_hospital_match(matched_terms):
+    #         return 0.60
+    #
+    #     # 如果没有关键词匹配，使用语义分析
+    #     if self.semantic_analyzer is not None:
+    #         try:
+    #             semantic_score = self.semantic_analyzer.calculate_similarity(sentence)
+    #             # 将语义相似度映射到合适的范围
+    #             if semantic_score > 0.8:
+    #                 return 0.75  # 高语义相似度
+    #             elif semantic_score > 0.6:
+    #                 return 0.55  # 中等语义相似度
+    #             elif semantic_score > 0.4:
+    #                 return 0.35  # 较低语义相似度
+    #             else:
+    #                 return 0.15  # 很低相关度
+    #         except Exception as e:
+    #             print(f"语义分析出错: {e}")
+    #             return 0.10
+    #
+    #     # 如果没有任何匹配，返回很低的相关度
+    #     return 0.10
+    #
+    #
+    #
+    #
+    # def _has_exact_high_priority_match(self, matched_terms: Dict) -> bool:
+    #     """检查是否有精确匹配的高优先级术语（药物或医疗器械）"""
+    #     for term, info in matched_terms.items():
+    #         if (info.get('match_type') == 'exact' and
+    #             info.get('type') in ['drug', 'device']):
+    #             return True
+    #     return False
+    #
+    # def _has_fuzzy_high_priority_match(self, matched_terms: Dict) -> bool:
+    #     """检查是否有模糊匹配的高优先级术语（药物或医疗器械）"""
+    #     for term, info in matched_terms.items():
+    #         if (info.get('match_type') == 'fuzzy' and
+    #             info.get('type') in ['drug', 'device'] and
+    #             info.get('confidence', 0) >= 70):
+    #             return True
+    #     return False
+    #
+    # def _has_disease_match(self, matched_terms: Dict) -> bool:
+    #     """检查是否有疾病相关术语匹配"""
+    #     for term, info in matched_terms.items():
+    #         if info.get('type') == 'disease':
+    #             return True
+    #     return False
+    #
+    # def _has_hospital_match(self, matched_terms: Dict) -> bool:
+    #     """检查是否有医院相关术语匹配"""
+    #     for term, info in matched_terms.items():
+    #         if info.get('type') == 'hospital':
+    #             return True
+    #     return False
     
     def analyze_batch(self, sentences: List[str]) -> List[Tuple[float, str, str]]:
         """
@@ -232,7 +287,8 @@ class MedicalQuestionAnalyzer:
             iterator = tqdm(sentences, desc="分析句子", unit="句")
         else:
             iterator = sentences
-        
+
+            # 遍历分析单个句子
         for sentence in iterator:
             try:
                 result = self.analyze_single_sentence(sentence)
@@ -429,8 +485,8 @@ def main():
         # 交互式模式
         print("\n系统初始化完成！")
         print("使用说明：")
-        print("1. 输入句子进行单句分析")
-        print("2. 输入 'file 文件路径' 处理文件")
+        # print("1. 输入句子进行单句分析")
+        print("1. 输入 file '文件路径' 处理文件")
         print("3. 输入 'quit' 或 'exit' 退出")
         
         while True:
@@ -447,14 +503,14 @@ def main():
                     # 开始处理文件
                     analyzer.process_file(file_path)
                     continue
-                
+
                 if not user_input:
                     continue
                 
-                # 单句分析
-                score, key_term, sentence = analyzer.analyze_single_sentence(user_input)
-                result = analyzer.format_output([(score, key_term, sentence)])
-                print(f"分析结果: {result[0]}")
+                # # 单句分析
+                # score, key_term, sentence = analyzer.analyze_single_sentence(user_input)
+                # result = analyzer.format_output([(score, key_term, sentence)])
+                # print(f"分析结果: {result[0]}")
                 
             except KeyboardInterrupt:
                 print("\n\n再见！")

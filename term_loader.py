@@ -10,7 +10,8 @@ import os
 class TermLoader:
     """术语加载器类"""
     
-    def __init__(self, terms_file: str = "medical_terms.txt"):
+    # def __init__(self, terms_file: str = r"D:\claudetest2\FileProcess\medical_terms.txt"):
+    def __init__(self, config: Dict):
         """
         初始化术语加载器 - 创建医疗术语文件解析器
         
@@ -31,7 +32,8 @@ class TermLoader:
         Args:
             terms_file: 医疗术语库文件路径，默认为"medical_terms.txt"
         """
-        self.terms_file = terms_file
+        self.terms_file = config.get("terms_file")
+        # self.terms_file = terms_file
         
     def load_terms_from_file(self) -> Tuple[List[str], List[str], List[str], List[str]]:
         """

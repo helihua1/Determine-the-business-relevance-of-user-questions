@@ -187,9 +187,16 @@ class KeywordMatcher:
             # print(best_match)  # 输出: ('apples', 90)
 
             # 指定匹配算法（scorer=fuzz.partial_ratio），fuzz.partial_ratio 使用编辑距离算法计算字符串相似度
+
+            # 数组l = [1, 2, 3] （array）通常要求 所有元素类型相同（例如 int 数组只能放整数）。
+            # 元组t = (1, 2, 3) （tuple）可以放不同类型的数据，元组是 不可变的（immutable），t[0] = 99  # ❌
+
+            # >>> choices = ["苹果", "香蕉", "橘子"]
+            # >>> process.extractOne("苹", choices, scorer=fuzz.partial_ratio)
+            # 返回 元组：('苹果', 100)
             best_match = process.extractOne(word, self.all_terms, 
                                           scorer=fuzz.partial_ratio)
-            # 相似度阈值过滤
+            # 相似度阈值过滤，（大于设定的阈值）
             if best_match and best_match[1] >= fuzzy_threshold * 100:
                 fuzzy_matches.append((best_match[0], best_match[1]))
         
