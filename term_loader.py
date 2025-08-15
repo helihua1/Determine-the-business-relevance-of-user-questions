@@ -35,15 +35,15 @@ class TermLoader:
         self.terms_file = config.get("terms_file")
         # self.terms_file = terms_file
         
-    def load_terms_from_file(self) -> Tuple[List[str], List[str], List[str], List[str]]:
+    def load_terms_from_file(self) -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
         """
         从文件加载术语 - 解析医疗术语文件并按类别分类
         
-        目的: 从structured文本文件中提取四类医疗术语
+        目的: 从structured文本文件中提取五类医疗术语
         处理逻辑:
         1. 检查术语文件是否存在，不存在则使用默认术语
         2. 按行读取文件，忽略注释行(#)和空行
-        3. 识别分类标记([DRUG], [DEVICE], [DISEASE], [HOSPITAL])
+        3. 识别分类标记([DRUG], [DEVICE], [DISEASE], [HOSPITAL], [SAMPLE])
         4. 将术语分配到对应的类别列表
         5. 处理文件读取异常，自动回退到默认术语
         6. 输出加载统计信息
@@ -64,6 +64,9 @@ class TermLoader:
         [DEVICE]        # 医疗器械分类开始  
         308激光治疗仪
         光疗仪
+        [SAMPLE]        # 样本分类开始（仅用于语义分析器初始化）
+        样本术语1
+        样本术语2
         ```
         
         错误处理:
@@ -73,13 +76,14 @@ class TermLoader:
         - 未知分类: 警告提示，跳过该术语
         
         Returns:
-            Tuple[List[str], List[str], List[str], List[str]]: 
-            (药物术语列表, 医疗器械术语列表, 疾病术语列表, 医院术语列表)
+            Tuple[List[str], List[str], List[str], List[str], List[str]]: 
+            (药物术语列表, 医疗器械术语列表, 疾病术语列表, 医院术语列表, 样本术语列表)
         """
         drugs = []
         devices = []
         diseases = []
         hospitals = []
+        samples = []
         
         if not os.path.exists(self.terms_file):
             print(f"警告：术语文件 {self.terms_file} 不存在，使用默认术语")
@@ -103,7 +107,7 @@ class TermLoader:
                     if line.startswith('[') and line.endswith(']'):
                         # [1:-1] 表示从索引1开始到倒数第二个字符结束（不包含最后一个字符）目的是去掉方括号 [ 和 ]
                         category = line[1:-1].upper()#
-                        if category in ['DRUG', 'DEVICE', 'DISEASE', 'HOSPITAL']:
+                        if category in ['DRUG', 'DEVICE', 'DISEASE', 'HOSPITAL', 'SAMPLE']:
                             current_category = category
                         else:
                             print(f"警告：第{line_num}行包含未知分类标记: {line}")
@@ -118,20 +122,22 @@ class TermLoader:
                         diseases.append(line)
                     elif current_category == 'HOSPITAL':
                         hospitals.append(line)
+                    elif current_category == 'SAMPLE':
+                        samples.append(line)
                     else:
                         print(f"警告：第{line_num}行的术语'{line}'没有指定分类，将被忽略")
             
             print(f"术语加载完成：药物{len(drugs)}个，医疗器械{len(devices)}个，"
-                  f"疾病{len(diseases)}个，医院{len(hospitals)}个")
+                  f"疾病{len(diseases)}个，医院{len(hospitals)}个，样本{len(samples)}个")
             
-            return drugs, devices, diseases, hospitals
+            return drugs, devices, diseases, hospitals, samples
             
         except Exception as e:
             print(f"加载术语文件时出错: {e}")
             print("使用默认术语")
             return self._get_default_terms()
     
-    def _get_default_terms(self) -> Tuple[List[str], List[str], List[str], List[str]]:
+    def _get_default_terms(self) -> Tuple[List[str], List[str], List[str], List[str], List[str]]:
         """
         获取默认术语 - 文件加载失败时的备用术语库
         
@@ -141,12 +147,13 @@ class TermLoader:
         2. 定义核心医疗器械术语列表
         3. 定义核心疾病术语列表  
         4. 定义核心医院术语列表
-        5. 返回四个分类的术语元组
+        5. 定义样本术语列表
+        6. 返回五个分类的术语元组
         
         使用技术:
         - 硬编码数据: 确保基本功能可用
         - 精选术语: 包含最常见和重要的医疗术语
-        - 分类完整: 覆盖四个主要医疗术语类别
+        - 分类完整: 覆盖五个主要医疗术语类别
         
         备用术语选择原则:
         - 高频使用: 选择常见的医疗术语
@@ -160,8 +167,8 @@ class TermLoader:
         - 系统初始化时的应急方案
         
         Returns:
-            Tuple[List[str], List[str], List[str], List[str]]: 
-            默认的(药物, 器械, 疾病, 医院)术语列表
+            Tuple[List[str], List[str], List[str], List[str], List[str]]: 
+            默认的(药物, 器械, 疾病, 医院, 样本)术语列表
         """
         drugs = [
             "雷公藤", "他克莫司", "卡泊三醇", "甲氨蝶呤", "环孢素",
@@ -183,7 +190,11 @@ class TermLoader:
             "皮肤科医院", "白癜风医院", "银屑病医院"
         ]
         
-        return drugs, devices, diseases, hospitals
+        samples = [
+            "样本术语1", "样本术语2", "样本术语3"
+        ]
+        
+        return drugs, devices, diseases, hospitals, samples
     
     def add_terms_to_file(self, new_drugs: List[str] = None, 
                          new_devices: List[str] = None,
@@ -241,12 +252,13 @@ class TermLoader:
         #   devices = result[1]
         #   diseases = result[2]
         #   hospitals = result[3]
-        drugs, devices, diseases, hospitals = self.load_terms_from_file()
+        drugs, devices, diseases, hospitals, samples = self.load_terms_from_file()
         
         return {
             'drugs': len(drugs),
             'devices': len(devices), 
             'diseases': len(diseases),
             'hospitals': len(hospitals),
-            'total': len(drugs) + len(devices) + len(diseases) + len(hospitals)
+            'samples': len(samples),
+            'total': len(drugs) + len(devices) + len(diseases) + len(hospitals) + len(samples)
         }

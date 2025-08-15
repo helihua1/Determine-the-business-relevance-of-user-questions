@@ -42,7 +42,7 @@ class SemanticAnalyzer:
             raise
     
     def build_medical_corpus(self, drugs: List[str], devices: List[str], 
-                           diseases: List[str], hospitals: List[str]):
+                           diseases: List[str], hospitals: List[str], samples: List[str] = None):
         """
         构建医疗术语语料库
         Args:
@@ -50,9 +50,14 @@ class SemanticAnalyzer:
             devices: 医疗器械术语列表  
             diseases: 疾病术语列表
             hospitals: 医院术语列表
+            samples: 样本术语列表（可选，仅用于语义分析器初始化）
         """
         # 合并所有医疗术语
         self.medical_terms = drugs + devices + diseases + hospitals
+        
+        # 如果提供了样本术语，也添加到语料库中
+        if samples:
+            self.medical_terms.extend(samples)
         
         # 添加一些医疗相关的语境句子，提高语义理解
         medical_context = [

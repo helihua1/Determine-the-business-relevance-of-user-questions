@@ -103,15 +103,15 @@ class MedicalQuestionAnalyzer:
         #     print(f"设置离线模式失败: {e}")
         
         # 加载术语库
-        drugs, devices, diseases, hospitals = self.term_loader.load_terms_from_file()
+        drugs, devices, diseases, hospitals, samples = self.term_loader.load_terms_from_file()
         
-        # 初始化关键词匹配器
+        # 初始化关键词匹配器（不包含samples）
         self.keyword_matcher.load_terms(drugs, devices, diseases, hospitals)
         
-        # 初始化语义分析器
+        # 初始化语义分析器（包含samples）
         try:
             print("正在初始化语义分析器...")
-            self.semantic_analyzer.build_medical_corpus(drugs, devices, diseases, hospitals)
+            self.semantic_analyzer.build_medical_corpus(drugs, devices, diseases, hospitals, samples)
             self.semantic_analyzer.load_model()
             self.semantic_analyzer.encode_medical_terms()
             print("语义分析器初始化成功！")
