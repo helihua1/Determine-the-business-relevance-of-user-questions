@@ -1,0 +1,22 @@
+# 医疗问句相关度分析配置文件
+
+# 相似度阈值设置
+similarity_thresholds:
+  high_confidence: 0.8      # 高置信度阈值，直接判定为相关
+  low_confidence: 0.6       # 低置信度阈值，低于此值直接判定为不相关
+  fuzzy_match: 0.7         # 模糊匹配阈值
+
+# 模糊匹配参数
+fuzzy_match:
+  min_length: 2            # 最小匹配长度
+  edit_distance_threshold: 2  # 编辑距离阈值
+
+# 批处理设置
+batch_processing:
+  batch_size: 1000         # 每批处理的句子数量
+  show_progress: true      # 是否显示进度条
+
+# 输出设置
+output:
+  decimal_places: 2        # 相关度分数保留小数位数
+  encoding: "utf-8"        # 输出文件编码
