@@ -511,9 +511,10 @@ class SemanticAnalyzer:
         # 2. 创建负样本对：不同疾病类别间的配对
         negative_pairs = []
         for i in range(2000):  # 创建2000个负样本对
-            # 白癜风和银屑病 vs 无关疾病
-            negative_pairs.append((random.choice(combined), random.choice(wuguanbing)))
-
+            # 白癜风vs银屑病 vs 无关疾病
+            negative_pairs.append((random.choice(baidianfeng), random.choice(wuguanbing)))
+            negative_pairs.append((random.choice(yinxiebing), random.choice(wuguanbing)))
+            negative_pairs.append((random.choice(baidianfeng), random.choice(yinxiebing)))
 
         # 3. 创建训练样本
         train_examples = []
