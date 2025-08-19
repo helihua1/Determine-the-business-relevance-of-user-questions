@@ -188,8 +188,11 @@ class SemanticAnalyzer:
             # 例：
             # similarities = [[0.95, 0.82, 0.76, 0.65, 0.58]]  # 相似度从高到低
             # indices      = [[123, 456, 789, 101, 202]]       # 对应的术语索引
-            max_similarity = float(similarities[0][0]) if len(similarities[0]) > 0 else 0.0
-            return max(0.0, min(1.0, max_similarity))  # 确保在0-1范围内
+
+            # max_similarity = float(similarities[0][0]) if len(similarities[0]) > 0 else 0.0
+            # return max(0.0, min(1.0, max_similarity))  # 确保在0-1范围内
+            max_similarity = float(similarities[0][0])
+            return max_similarity
         else:
             # 如果没有FAISS索引，使用传统方法计算
             # sentence_vector：是你当前要查询的句子向量（shape 一般是 (1, d) 或 (d,)）。
@@ -197,6 +200,7 @@ class SemanticAnalyzer:
             # self.medical_vectors.T：把 (n, d) 转置成 (d, n)，这样才能和 (1, d) 做矩阵乘法。
             # 数学上就是把当前句子向量和每个医学向量分别做 点积（inner product）。
             # similarities是和每个医学向量做点积的结果，shape是(1, n)
+            print("如果没有FAISS索引，使用传统方法计算")
             similarities = np.dot(sentence_vector, self.medical_vectors.T)
             max_similarity = float(np.max(similarities))
             return max(0.0, min(1.0, max_similarity))

@@ -496,13 +496,16 @@ def main():
                 if user_input.lower() in ['quit', 'exit', '退出']:
                     print("再见！")
                     break
-                
-                if user_input.lower().startswith('file '):
-                    file_path = user_input[5:].strip()
+                # 输入file+路径
+                # if user_input.lower().startswith('file '):
+                #     file_path = user_input[5:].strip()
+                #
+                #     # 开始处理文件
+                #     analyzer.process_file(file_path)
+                #     continue
 
-                    # 开始处理文件
-                    analyzer.process_file(file_path)
-                    continue
+                #直接读取输入为路径
+                analyzer.process_file(user_input.lower())
 
                 if not user_input:
                     continue
