@@ -524,4 +524,8 @@ def main():
  
 
 if __name__ == "__main__":
+
+
+    print(f"Python可执行文件路径: {sys.executable}")
+    print(f"Python版本: {sys.version}")
     main()
