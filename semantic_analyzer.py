@@ -35,6 +35,9 @@ class SemanticAnalyzer:
         # 向量缓存文件路径
         self.vector_cache_file = "medical_vectors.pkl"
         
+        # 模型权重缓存路径
+        self.model_weights_dir = "trained_model_weights"
+        
         # 初始化时检测设备
         self._detect_device()
         
@@ -80,12 +83,147 @@ class SemanticAnalyzer:
             print(f"设备检测出错: {e}")
             print("使用CPU作为备选方案")
             self.device = torch.device('cpu')
+    
+    def _load_trained_weights(self) -> bool:
+        """
+        尝试加载已训练的模型权重
+        Returns:
+            bool: 是否成功加载权重
+        """
+        try:
+            # 检查权重目录是否存在
+            if not os.path.exists(self.model_weights_dir):
+                print(f"权重目录不存在: {self.model_weights_dir}")
+                return False
+            
+            # 检查权重文件是否存在
+            weights_path = os.path.join(self.model_weights_dir, "model_weights.pth")
+            if not os.path.exists(weights_path):
+                print(f"权重文件不存在: {weights_path}")
+                return False
+            
+            # 检查权重文件是否完整（至少1MB）
+            if os.path.getsize(weights_path) < 1024 * 1024:
+                print("权重文件过小，可能损坏")
+                return False
+            
+            print(f"发现权重文件: {weights_path}")
+            
+            # 加载预训练模型
+            self.model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+            
+            # 将模型移动到检测到的设备
+            if self.device.type == 'cuda':
+                self.model = self.model.to(self.device)
+            
+            # 加载训练后的权重
+            state_dict = torch.load(weights_path, map_location=self.device)
+            self.model.load_state_dict(state_dict)
+            
+            print("模型权重加载成功！")
+            return True
+            
+        except Exception as e:
+            print(f"加载权重失败: {e}")
+            return False
+    
+    def _save_trained_weights(self):
+        """保存训练后的模型权重"""
+        try:
+            # 创建权重目录
+            if not os.path.exists(self.model_weights_dir):
+                os.makedirs(self.model_weights_dir)
+            
+            # 保存权重
+            weights_path = os.path.join(self.model_weights_dir, "model_weights.pth")
+            state_dict = self.model.state_dict()
+            torch.save(state_dict, weights_path)
+            
+            print(f"模型权重已保存到: {weights_path}")
+            
+        except Exception as e:
+            print(f"保存权重失败: {e}")
+    
+    def _should_retrain(self) -> bool:
+        """
+        检查是否需要重新训练模型
+        Returns:
+            bool: 是否需要重新训练
+        """
+        try:
+            # 检查权重文件是否存在
+            weights_path = os.path.join(self.model_weights_dir, "model_weights.pth")
+            if not os.path.exists(weights_path):
+                print("权重文件不存在，需要训练")
+                return True
+            
+            # 检查权重文件是否完整
+            if os.path.getsize(weights_path) < 1024 * 1024:
+                print("权重文件损坏，需要重新训练")
+                return True
+            
+            # 检查向量缓存是否存在且完整
+            if not os.path.exists(self.vector_cache_file):
+                print("向量缓存不存在，需要训练")
+                return True
+            
+            # 检查向量缓存文件大小
+            if os.path.getsize(self.vector_cache_file) < 1024 * 100:  # 至少100KB
+                print("向量缓存文件过小，需要重新训练")
+                return True
+            
+            print("所有缓存文件完整，无需重新训练")
+            return False
+            
+        except Exception as e:
+            print(f"检查训练状态时出错: {e}")
+            return True
+    
+    def force_retrain(self):
+        """
+        强制重新训练模型
+        删除所有缓存文件并重新训练
+        """
+        try:
+            print("强制重新训练模型...")
+            
+            # 删除权重文件
+            weights_path = os.path.join(self.model_weights_dir, "model_weights.pth")
+            if os.path.exists(weights_path):
+                os.remove(weights_path)
+                print(f"已删除权重文件: {weights_path}")
+            
+            # 删除向量缓存文件
+            if os.path.exists(self.vector_cache_file):
+                os.remove(self.vector_cache_file)
+                print(f"已删除向量缓存文件: {self.vector_cache_file}")
+            
+            # 删除权重目录（如果为空）
+            if os.path.exists(self.model_weights_dir) and not os.listdir(self.model_weights_dir):
+                os.rmdir(self.model_weights_dir)
+                print(f"已删除空权重目录: {self.model_weights_dir}")
+            
+            print("缓存清理完成，下次启动时将重新训练")
+            
+        except Exception as e:
+            print(f"清理缓存失败: {e}")
         
     def load_model(self):
         """加载sentence-transformers模型"""
         try:
             print("正在加载语义相似度模型...")
-            # 使用多语言模型，支持中文
+            
+            # 检查是否需要重新训练
+            if not self._should_retrain():
+                # 如果不需要重新训练，尝试加载已训练的模型权重
+                if self._load_trained_weights():
+                    print("成功加载已训练的模型权重！")
+                    return
+                else:
+                    print("权重加载失败，将重新训练...")
+            
+            # 需要训练或权重加载失败，加载预训练模型
+            print("加载预训练模型...")
             self.model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
             
             # 将模型移动到检测到的设备
@@ -328,6 +466,7 @@ class SemanticAnalyzer:
         wuguanbing = ["皮炎","头皮真菌感染","荨麻疹","肝","降糖","高血压","咬","高血脂","糖尿病","湿疹","肛瘘","肾","祛斑","高血压","脑病","颈椎","癫痫","鼻炎","抑郁症","中风","心脏病","腰突","腰椎","肠胃炎","便秘","淋巴结核","癌","胃病","肿瘤","皮炎","黄褐斑","去斑","美容","湿疹","疱疹","斑秃","玫瑰痤疮","白内障","荨麻疹","脱发","痘痘","脚气","红斑狼疮","白色糠疹","致畸","双休","唇炎","脚气","紫癜","鱼鳞病","鼻喷","尿布疹","痤疮","唇炎","痔疮","扁平疣","粉刺","泡疹","扁平苔藓","口疮","玫瑰糠疹","白色糠疹","囊肿","突眼","眼凸","普秃","白塞病","强直性","灰指甲","火疖","祛痘","疤痕","猫癣","头癣","祛疤","毛囊炎","狐臭","痱子","糠疹","虫咬","脂溢性","疣","花斑癣","脚臭","肾病","疮","痘","口周炎","脚癣","狐臭","酒渣鼻","口角炎","硬皮病","肿瘤","泌尿","白内障","白血病","白念珠菌","白塞病","眉毛","头发","白发"] 
         combined = baidianfeng + yinxiebing
 
+        # #因为loss过高，8左右，所以放弃
         # # 会将相同texts中识别为相似，其他texts中识别为不相似
         # train_examples = [
         #     InputExample(texts= combined),   # 正样本
@@ -337,7 +476,14 @@ class SemanticAnalyzer:
         # # 创建训练数据加载器，用于批量处理训练样本
         # # shuffle=True: 随机打乱训练数据顺序，提高训练效果
         # # batch_size=16: 每批处理16个样本，平衡内存使用和训练效率
-        # train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=16)
+        # # pin_memory: 根据设备类型动态设置，GPU时启用以加速数据传输
+        # pin_memory = self.device.type == 'cuda'
+        # train_dataloader = DataLoader(
+        #     train_examples,
+        #     shuffle=True,
+        #     batch_size=16,
+        #     pin_memory=pin_memory
+        # )
         #
         # # 定义训练损失函数：多负样本排序损失
         # train_loss = losses.MultipleNegativesRankingLoss(self.model)
@@ -349,9 +495,12 @@ class SemanticAnalyzer:
         #     # 这里只有一个训练目标，也可以设置多个不同的训练任务
         #     train_objectives=[(train_dataloader, train_loss)],
         #     # epochs=2: 训练轮数，模型将整个训练数据集学习2遍
-        #     epochs=2,
-        #     show_progress_bar=True
+        #     epochs=1,
+        #     show_progress_bar=True,
+        #     # GPU优化参数
+        #     optimizer_params={'lr': 2e-5} if self.device.type == 'cuda' else {}
         # )
+        
         # 1. 创建正样本对：相同疾病类别内的别名配对
         positive_pairs = []
         for disease_list in [baidianfeng, yinxiebing]:
@@ -362,12 +511,9 @@ class SemanticAnalyzer:
         # 2. 创建负样本对：不同疾病类别间的配对
         negative_pairs = []
         for i in range(2000):  # 创建2000个负样本对
-            # 白癜风 vs 银屑病
-            negative_pairs.append((random.choice(baidianfeng), random.choice(yinxiebing)))
-            # 白癜风 vs 无关疾病
-            negative_pairs.append((random.choice(baidianfeng), random.choice(wuguanbing)))
-            # 银屑病 vs 无关疾病
-            negative_pairs.append((random.choice(yinxiebing), random.choice(wuguanbing)))
+            # 白癜风和银屑病 vs 无关疾病
+            negative_pairs.append((random.choice(combined), random.choice(wuguanbing)))
+
 
         # 3. 创建训练样本
         train_examples = []
@@ -382,8 +528,8 @@ class SemanticAnalyzer:
         # 根据设备类型设置pin_memory参数
         pin_memory = self.device.type == 'cuda'  # 只有GPU时才启用pin_memory
         train_dataloader = DataLoader(
-            train_examples, 
-            shuffle=True, 
+            train_examples,
+            shuffle=True,
             batch_size=16,
             pin_memory=pin_memory  # 动态设置pin_memory
         )
@@ -402,3 +548,7 @@ class SemanticAnalyzer:
             # evaluation_steps=100,  # 每100步评估一次
             optimizer_params={'lr': 2e-5}  # 设置学习率
         )
+
+        # 训练完成后保存模型权重
+        print("训练完成，正在保存模型权重...")
+        self._save_trained_weights()
