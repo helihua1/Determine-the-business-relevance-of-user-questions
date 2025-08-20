@@ -173,18 +173,18 @@ class MedicalQuestionAnalyzer:
         # # 第三步：计算相关度分数
         # relevance_score = self._calculate_relevance_score(sentence, matched_terms)
 
-        relevance_score = self._calculate_relevance_score(sentence)
-        key_term = "只运行语义分析"
+        relevance_score, key_term = self._calculate_relevance_score(sentence)
+        # key_term = "只运行语义分析"
 
         return relevance_score, key_term, sentence
 
-    def _calculate_relevance_score(self, sentence: str) -> float:
+    def _calculate_relevance_score(self, sentence: str) -> Tuple[float, str]:
         """不运行模糊和精确匹配，只运行RAG判断的方法"""
 
         if self.semantic_analyzer is not None:
             try:
-                semantic_score = self.semantic_analyzer.calculate_similarity(sentence)
-                return semantic_score
+                semantic_score, term = self.semantic_analyzer.calculate_similarity(sentence)
+                return semantic_score, term
             except Exception as e:
                 print(f"语义分析出错: {e}")
                 return 0.10

@@ -236,7 +236,7 @@ class SemanticAnalyzer:
             print("模型加载完成！")
 
             # 加载完成后训练模型
-            self.train_model()
+            # self.train_model()
             
         except Exception as e:
             print(f"模型加载失败: {e}")
@@ -362,7 +362,7 @@ class SemanticAnalyzer:
         self.faiss_index.add(normalized_vectors.astype('float32'))
         print("FAISS索引构建完成！")
     
-    def calculate_similarity(self, sentence: str) -> float:
+    def calculate_similarity(self, sentence: str) -> Tuple[float, str]:
         """
         计算句子与医疗领域的语义相似度
         Args:
@@ -386,7 +386,7 @@ class SemanticAnalyzer:
         # 使用FAISS搜索最相似的术语
         if self.faiss_index is not None:
             similarities, indices = self.faiss_index.search(
-                sentence_vector.astype('float32'), k=5  # 返回前5个最相似的
+                sentence_vector.astype('float32'), k=3  # 返回前3个最相似的
             )
             
             # 返回最高相似度
@@ -397,7 +397,17 @@ class SemanticAnalyzer:
             # max_similarity = float(similarities[0][0]) if len(similarities[0]) > 0 else 0.0
             # return max(0.0, min(1.0, max_similarity))  # 确保在0-1范围内
             max_similarity = float(similarities[0][0])
-            return max_similarity
+            max_value = round(max_similarity,2)
+            # FAISS和medical_terms都是按照顺序加载的，所以索引是相同的。
+            # term = self.medical_terms[indices[0][0]]
+
+            # 前三的分数和关键词 拼接
+            top_three = ""
+            for i in range(len(similarities[0])):
+                rounded_value = int(similarities[0][i]*100)
+                term = self.medical_terms[indices[0][i]]
+                top_three += f"0.{rounded_value},{term}\n"
+            return max_value,top_three
         else:
             # 如果没有FAISS索引，使用传统方法计算
             # sentence_vector：是你当前要查询的句子向量（shape 一般是 (1, d) 或 (d,)）。
@@ -439,18 +449,18 @@ class SemanticAnalyzer:
                     results.append((term, float(sim)))
             
             return results
-        else:
-            # 传统方法
-            similarities = np.dot(sentence_vector, self.medical_vectors.T)[0]
+        # else:
+        #     # 传统方法
+        #     similarities = np.dot(sentence_vector, self.medical_vectors.T)[0]
             
-            # 获取前k个最相似的索引
-            top_indices = np.argsort(similarities)[-top_k:][::-1]
+        #     # 获取前k个最相似的索引
+        #     top_indices = np.argsort(similarities)[-top_k:][::-1]
             
-            results = []
-            for idx in top_indices:
-                term = self.medical_terms[idx]
-                sim = float(similarities[idx])
-                results.append((term, sim))
+        #     results = []
+        #     for idx in top_indices:
+        #         term = self.medical_terms[idx]
+        #         sim = float(similarities[idx])
+        #         results.append((term, sim))
             
             return results
     
