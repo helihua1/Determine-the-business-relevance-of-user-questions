@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 import random
 import torch  # 添加torch导入
 from semantic_visualizer import visualize_medical_terms
-
+from typing import List, Dict, Tuple, Optional, Union
 class SemanticAnalyzer:
     """语义相似度分析器类"""
     
@@ -478,9 +478,13 @@ class SemanticAnalyzer:
         wuguanbing_mini = ["皮炎","头皮真菌感染","荨麻疹","肝","降糖","高血压","咬","高血脂","糖尿病","湿疹","肛瘘","肾"] 
         A = baidianfeng + yinxiebing
         B = wuguanbing_mini
+        # 新增类别用法
+        A_terms = ["药物A", "治疗A", "症状A"]
+        B_terms = ["药物B", "治疗B", "症状B"]
+        C_terms = ["药物C", "治疗C", "症状C"]
 
         # 训练前的分布图
-        self.visualize_semantic_space(A, B)
+        self.visualize_semantic_space(A, B,A_terms,B_terms,C_terms)
 
         # 3. 创建训练样本
         train_examples = []
@@ -564,15 +568,25 @@ class SemanticAnalyzer:
         # 训练前的分布图
         self.visualize_semantic_space(A, B)
 
-    def visualize_semantic_space(self, baidianfeng_terms: List[str], other_terms: List[str]):
+    def visualize_semantic_space(self,
+                                 baidianfeng_terms: List[str],
+                                 other_terms: List[str],
+                                 A_terms: Optional[List[str]] = None,
+                                 B_terms: Optional[List[str]] = None,
+                                 C_terms: Optional[List[str]] = None):
         """
-        可视化语义空间分布
+        可视化语义空间分布（支持多类别）
         Args:
             baidianfeng_terms: 白癜风相关术语列表
             other_terms: 其他疾病术语列表
+            A_terms: A类术语列表（可选）
+            B_terms: B类术语列表（可选）
+            C_terms: C类术语列表（可选）
         """
         try:
-            return visualize_medical_terms(self, baidianfeng_terms, other_terms)
+            return visualize_medical_terms(
+                self, baidianfeng_terms, other_terms, A_terms, B_terms, C_terms
+            )
         except Exception as e:
             print(f"可视化失败: {e}")
             return None
