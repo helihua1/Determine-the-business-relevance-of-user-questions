@@ -14,7 +14,7 @@ import os
 from torch.utils.data import DataLoader
 import random
 import torch  # 添加torch导入
-
+from semantic_visualizer import visualize_medical_terms
 
 class SemanticAnalyzer:
     """语义相似度分析器类"""
@@ -234,6 +234,7 @@ class SemanticAnalyzer:
                 print("模型使用CPU运行")
                 
             print("模型加载完成！")
+
 
             # 加载完成后训练模型
             self.train_model()
@@ -478,6 +479,8 @@ class SemanticAnalyzer:
         A = baidianfeng + yinxiebing
         B = wuguanbing_mini
 
+        # 训练前的分布图
+        self.visualize_semantic_space(A, B)
 
         # 3. 创建训练样本
         train_examples = []
@@ -487,31 +490,30 @@ class SemanticAnalyzer:
         
         # 创建A组内的正样本（相似样本）
         a_positive_pairs = []
-        # for i in range(len(A)):
-        #     for j in range(i + 1, min(i + 10, len(A))):  # 每个词最多与10个其他词配对
-        #         if len(a_positive_pairs) < max_samples // 3:  # 分配1/3给A组正样本
-        #             a_positive_pairs.append((A[i], A[j]))
+        for i in range(len(A)):
+            for j in range(i + 1, min(i + 10, len(A))):  # 每个词最多与10个其他词配对
+                if len(a_positive_pairs) < max_samples // 3:  # 分配1/3给A组正样本
+                    a_positive_pairs.append((A[i], A[j]))
         
         # # 创建B组内的正样本（相似样本）
         b_positive_pairs = []
-        # for i in range(len(B)):
-        #     for j in range(i + 1, min(i + 10, len(B))):  # 每个词最多与10个其他词配对
-        #         if len(b_positive_pairs) < max_samples // 3:  # 分配1/3给B组正样本
-        #             b_positive_pairs.append((B[i], B[j]))
+        for i in range(len(B)):
+            for j in range(i + 1, min(i + 10, len(B))):  # 每个词最多与10个其他词配对
+                if len(b_positive_pairs) < max_samples // 3:  # 分配1/3给B组正样本
+                    b_positive_pairs.append((B[i], B[j]))
         
         # 创建A和B组之间的负样本（不相似样本）
         negative_pairs = []
         for i in range(len(A)):
             for j in range(len(B)):
-                # if len(negative_pairs) < max_samples // 3:  # 分配1/3给负样本
-                if len(negative_pairs) < max_samples :
+                if len(negative_pairs) < max_samples // 3:  # 分配1/3给负样本
                     negative_pairs.append((A[i], B[j]))
         
         # 添加正样本（A组内和B组内）
         for pair in a_positive_pairs:
             train_examples.append(InputExample(texts=[pair[0], pair[1]], label=1.0))
-        # for pair in b_positive_pairs:
-        #     train_examples.append(InputExample(texts=[pair[0], pair[1]], label=1.0))
+        for pair in b_positive_pairs:
+            train_examples.append(InputExample(texts=[pair[0], pair[1]], label=1.0))
         
         # 添加负样本（A和B组之间）
         for pair in negative_pairs:
@@ -558,3 +560,19 @@ class SemanticAnalyzer:
         # 训练完成后保存模型权重
         print("训练完成，正在保存模型权重...")
         self._save_trained_weights()
+
+        # 训练前的分布图
+        self.visualize_semantic_space(A, B)
+
+    def visualize_semantic_space(self, baidianfeng_terms: List[str], other_terms: List[str]):
+        """
+        可视化语义空间分布
+        Args:
+            baidianfeng_terms: 白癜风相关术语列表
+            other_terms: 其他疾病术语列表
+        """
+        try:
+            return visualize_medical_terms(self, baidianfeng_terms, other_terms)
+        except Exception as e:
+            print(f"可视化失败: {e}")
+            return None
